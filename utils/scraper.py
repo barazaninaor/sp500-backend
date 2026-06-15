@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 
 # Fix path to import database (preventing circular import)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from backend.database import companies_collection, sectors_collection
+from database import companies_collection, sectors_collection
 
 def update_sp500_data():
     print("Starting full data scrape (Wikipedia + Yahoo)...")
