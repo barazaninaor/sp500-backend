@@ -8,12 +8,12 @@ from bs4 import BeautifulSoup
 import time
 import gc
 
-# Fix path to import database
+# Fix path to import database (if running from subfolder)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from database import companies_collection, sectors_collection
 
 def update_sp500_data():
-    print("Starting full data scrape (Wikipedia + Yahoo)...")
+    print("Starting optimized data scrape...")
     
     # 1. Wikipedia: Fetch and Parse
     url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
@@ -40,7 +40,7 @@ def update_sp500_data():
     data = df.to_dict('records')
     symbols = [entry['Symbol'] for entry in data]
     
-    # 2. Update Sectors First
+    # 2. Update Sectors
     for entry in data:
         sector_name = entry['Sector']
         sector_id = sector_name.lower().replace(" ", "_")
@@ -50,22 +50,22 @@ def update_sp500_data():
             upsert=True
         )
 
-    # 3. Yahoo Finance: Get dynamic market data in Batches (to save memory)
-    batch_size = 50
+    # 3. Yahoo Finance: Get dynamic market data with strict memory limits
+    # הקטנה ל-10 מניות ב-Batch כדי למנוע Memory Overflow ב-Render
+    batch_size = 10 
     for i in range(0, len(symbols), batch_size):
         batch = symbols[i : i + batch_size]
         print(f"Processing batch {i//batch_size + 1}: {batch}")
         
         try:
-            # הורדה קבוצתית יעילה
-            batch_data = yf.download(batch, period="1d", group_by='ticker', progress=False)
+            # threads=False מונע יצירת תהליכי משנה כבדים שגורמים ל-SIGKILL בשרת חינמי
+            batch_data = yf.download(batch, period="1d", group_by='ticker', progress=False, threads=False)
             
             for entry in data:
                 symbol = entry['Symbol']
                 if symbol in batch:
                     try:
-                        # חילוץ נתונים
-                        # אם זה batch, המבנה של המידע משתנה מעט
+                        # טיפול במבנה נתונים שונה בהתאם לכמות התוצאות
                         stock_info = batch_data[symbol] if len(batch) > 1 else batch_data
                         
                         last_price = float(stock_info['Close'].iloc[-1])
@@ -84,8 +84,7 @@ def update_sp500_data():
                                 "last_price": round(last_price, 2),
                                 "change": round(last_price - prev_close, 2),
                                 "percent_change": round(((last_price - prev_close) / prev_close) * 100, 2),
-                                "volume": int(stock_info['Volume'].iloc[-1]),
-                                "market_cap": None # fast_info פחות זמין ב-download, ניתן להשאיר None או להשתמש ב-info בנפרד
+                                "volume": int(stock_info['Volume'].iloc[-1])
                             }
                         }
                         companies_collection.update_one({"_id": symbol}, {"$set": company_doc}, upsert=True)
@@ -95,12 +94,12 @@ def update_sp500_data():
         except Exception as e:
             print(f"Batch processing error: {e}")
         
-        # שחרור זיכרון והשהיה בין קבוצות
+        # ניקוי זיכרון אגרסיבי והשהיה
         del batch_data
         gc.collect()
-        time.sleep(3) 
+        time.sleep(4) 
 
-    print("Full scraping process completed!")
+    print("Full scraping process completed successfully!")
 
 if __name__ == "__main__":
     update_sp500_data()
