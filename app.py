@@ -13,7 +13,7 @@ from routes.stocks_update import update_bp
 app = Flask(__name__)
 
 # הגדרת CORS - מאפשר גישה מכל מקור, או הגדר דומיין ספציפי ליתר ביטחון
-CORS(app, resources={r"/*": {"origins": "https://barazaninaor.github.io"}})
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 # רישום ה-Blueprints
 app.register_blueprint(stocks_bp)
