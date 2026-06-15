@@ -34,8 +34,12 @@ def get_stocks_with_sectors():
     stocks = list(companies_collection.aggregate(pipeline))
     return jsonify(safe_jsonify(stocks)), 200
 
-# 3. GET all sectors
+# 3. GET all sectors - ניסיון אחרון ועוקף בעיות
 @stocks_bp.route('/sectors', methods=['GET'])
 def get_all_sectors():
-    sectors = list(sectors_collection.find({}))
-    return jsonify(safe_jsonify(sectors)), 200
+    try:
+        # טעינת כל הסקטורים כרשימה פשוטה
+        sectors = list(sectors_collection.find({}, {"_id": 1, "name": 1}))
+        return jsonify(safe_jsonify(sectors)), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
